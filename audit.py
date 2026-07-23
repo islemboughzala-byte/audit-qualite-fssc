@@ -1,63 +1,29 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import requests
 import os
 from datetime import datetime
 
 # -----------------------------------------------------------------------------
-# 1. CONFIGURATION ET STYLE PROPRE (FOND BLANC & TIMES NEW ROMAN)
+# CONFIGURATION DES URLS
 # -----------------------------------------------------------------------------
-st.set_page_config(
-    page_title="Audit FSSC 22000",
-    page_icon="🛡️",
-    layout="wide"
-)
+APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxka-wuIfQrSsS_QOkCujQL26ygFcsdJo9EpOp8ogSrAbINfCz5lN6fkdZDjNEtffKT/exec"
+GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1EWqeLrXYZ4Epe_MYiVRhu0xg3J13K7WGD0QgO3Ct_6k/export?format=csv"
+
+st.set_page_config(page_title="Audit FSSC 22000", page_icon="🛡️", layout="wide")
 
 st.markdown("""
 <style>
-    /* Fond blanc et police Times New Roman globale */
-    .stApp {
-        background-color: #FFFFFF !important;
-        font-family: "Times New Roman", Times, serif !important;
-        color: #000000 !important;
-    }
-    
-    /* Titres et textes */
-    h1, h2, h3, h4, p, label, span {
-        font-family: "Times New Roman", Times, serif !important;
-        color: #000000 !important;
-    }
-
-    /* Boutons élégants */
-    .stButton>button {
-        background-color: #000000 !important;
-        color: #FFFFFF !important;
-        font-family: "Times New Roman", Times, serif !important;
-        font-weight: bold !important;
-        border-radius: 4px !important;
-        padding: 10px 24px !important;
-        width: 100%;
-    }
-    .stButton>button:hover {
-        background-color: #333333 !important;
-        color: #FFFFFF !important;
-    }
+    .stApp { background-color: #FFFFFF !important; font-family: "Times New Roman", Times, serif !important; color: #000000 !important; }
+    h1, h2, h3, h4, p, label, span { font-family: "Times New Roman", Times, serif !important; color: #000000 !important; }
+    .stButton>button { background-color: #000000 !important; color: #FFFFFF !important; font-family: "Times New Roman", Times, serif !important; font-weight: bold !important; border-radius: 4px !important; padding: 10px 24px !important; width: 100%; }
+    .stButton>button:hover { background-color: #333333 !important; color: #FFFFFF !important; }
 </style>
 """, unsafe_allow_html=True)
 
-# Connexion Google Sheets ou secours CSV local
-try:
-    from streamlit_gsheets import GSheetsConnection
-    conn = st.connection("gsheets", type=GSheetsConnection)
-    use_gsheets = True
-except Exception:
-    use_gsheets = False
-
 LOCAL_FILE = "resultats_audit_qualite.csv"
 
-# -----------------------------------------------------------------------------
-# 2. STRUCTURES DE DONNÉES
-# -----------------------------------------------------------------------------
 STRUCTURE = {
     "El Mazraa": ["Charcuterie", "Surgelé", "Abattoir Dinde", "Petfood", "Co-produit", "Croquette"],
     "Dick": ["Abattoir Poulet"],
@@ -187,9 +153,6 @@ QUESTIONS_RESPONSABLES = {
     ]
 }
 
-# -----------------------------------------------------------------------------
-# 3. INTERFACE
-# -----------------------------------------------------------------------------
 if os.path.exists("banner.png"):
     st.image("banner.png", use_container_width=True)
 
@@ -269,36 +232,26 @@ with tab_form:
                     "Remarques": commentaires
                 }
 
-                saved = False
-                if use_gsheets:
-                    try:
-                        df_existing = conn.read(ttl="0")
-                        df_updated = pd.concat([df_existing, pd.DataFrame([entry])], ignore_index=True)
-                        conn.update(data=df_updated)
-                        saved = True
-                    except Exception:
-                        pass
-                
-                if not saved:
-                    df_e = pd.DataFrame([entry])
-                    if not os.path.exists(LOCAL_FILE):
-                        df_e.to_csv(LOCAL_FILE, index=False)
+                try:
+                    response = requests.post(APPS_SCRIPT_URL, json=entry)
+                    if response.status_code == 200:
+                        st.success("✅ Audit enregistré avec succès dans Google Sheets !")
                     else:
-                        df_e.to_csv(LOCAL_FILE, mode='a', header=False, index=False)
+                        st.warning("⚠️ Sauvegardé en local (erreur de liaison Google Sheet).")
+                        pd.DataFrame([entry]).to_csv(LOCAL_FILE, mode='a', header=not os.path.exists(LOCAL_FILE), index=False)
+                except Exception:
+                    pd.DataFrame([entry]).to_csv(LOCAL_FILE, mode='a', header=not os.path.exists(LOCAL_FILE), index=False)
+                    st.success("✅ Audit enregistré en local !")
 
-                st.success("✅ Audit enregistré avec succès !")
                 st.session_state['audit_started'] = False
 
 with tab_dash:
     st.subheader("Analyse des Performances")
 
     df = None
-    if use_gsheets:
-        try:
-            df = conn.read(ttl="0")
-        except Exception:
-            pass
-    if df is None or df.empty:
+    try:
+        df = pd.read_csv(GOOGLE_SHEET_CSV_URL)
+    except Exception:
         if os.path.exists(LOCAL_FILE):
             df = pd.read_csv(LOCAL_FILE)
 
