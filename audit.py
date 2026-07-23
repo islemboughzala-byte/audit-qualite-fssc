@@ -22,47 +22,25 @@ st.markdown("""
         color: #000000 !important;
     }
     
-   import streamlit as st
-import pandas as pd
-import plotly.express as px
-import os
-from datetime import datetime
-
-# -----------------------------------------------------------------------------
-# 1. CONFIGURATION ET STYLE PROPRE
-# -----------------------------------------------------------------------------
-st.set_page_config(
-    page_title="Audit FSSC 22000",
-    page_icon="🛡️",
-    layout="wide"
-)
-
-# NOUVEAU CSS : Empêche le bug de l'écran blanc lié au mode sombre de l'ordinateur
-st.markdown("""
-<style>
-    /* Fond blanc global */
-    .stApp {
-        background-color: #FFFFFF !important;
-    }
-    
-    /* Forcer TOUT le texte en noir pour éviter le bug du mode sombre */
-    .stApp, p, span, div, h1, h2, h3, h4, h5, h6, label, li {
+    /* Titres et textes */
+    h1, h2, h3, h4, p, label, span {
         font-family: "Times New Roman", Times, serif !important;
         color: #000000 !important;
     }
 
-    /* Exception : Garder le texte du bouton en blanc pour quil soit lisible */
-    div.stButton > button, div.stButton > button * {
+    /* Boutons élégants */
+    .stButton>button {
         background-color: #000000 !important;
         color: #FFFFFF !important;
         font-family: "Times New Roman", Times, serif !important;
         font-weight: bold !important;
         border-radius: 4px !important;
+        padding: 10px 24px !important;
+        width: 100%;
     }
-    div.stButton > button:hover {
+    .stButton>button:hover {
         background-color: #333333 !important;
         color: #FFFFFF !important;
-        border: 1px solid #000000 !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -101,12 +79,12 @@ QUESTIONS_PERSONNEL = {
     "1. Vision et mission": [
         "Connaissez-vous la politique de votre entreprise en matière de la sécurité des aliments ?",
         "Avez-vous reçu des connaissances sur la vision et la mission de l'entreprise ?",
-        "Pouvez-vous m'expliquer la vision et la mission de l'entreprise ?",
+        "Pouvez-vous me expliquer la vision et la mission de l'entreprise ?",
         "Savez-vous que l'entreprise dispose des certifications qualité ?",
         "Vos responsables vous communiquent-ils les attentes en matière de sécurité des aliments ?"
     ],
     "2. Personnel": [
-        "Avez-vous suivi une sensibilisation en matière de sécurité des aliments lors des 2 derniers mois ?",
+        "Avez-vous suivi un sensibilisation en matière de sécurité des aliments lors des 2 derniers mois ?",
         "Êtes-vous favorisé(e) à la mise en place d'outils (boîte à suggestions) pour signaler les problèmes ?",
         "Connaissez-vous les règles relatives aux droits au travail ?",
         "Utilisez-vous des gants lorsque vous touchez les aliments ?",
@@ -218,11 +196,6 @@ if os.path.exists("banner.png"):
 st.title("Évaluation de la Culture Sécurité des Aliments")
 st.markdown("---")
 
-# CORRECTION DU SESSION STATE : Gestion sécurisée du message de succès
-if st.session_state.get('audit_success', False):
-    st.success("✅ Audit enregistré avec succès !")
-    st.session_state['audit_success'] = False  # Réinitialisation manuelle
-
 tab_form, tab_dash = st.tabs(["📋 Saisie de l'Audit", "📊 Statistiques & Histogrammes"])
 
 with tab_form:
@@ -297,30 +270,24 @@ with tab_form:
                 }
 
                 saved = False
-                df_entry = pd.DataFrame([entry])
-
                 if use_gsheets:
                     try:
                         df_existing = conn.read(ttl="0")
-                        if df_existing is None or df_existing.empty:
-                            df_updated = df_entry
-                        else:
-                            df_updated = pd.concat([df_existing, df_entry], ignore_index=True)
+                        df_updated = pd.concat([df_existing, pd.DataFrame([entry])], ignore_index=True)
                         conn.update(data=df_updated)
                         saved = True
-                    except Exception as e:
-                        print(f"Erreur GSheets : {e}")
+                    except Exception:
                         pass
                 
                 if not saved:
+                    df_e = pd.DataFrame([entry])
                     if not os.path.exists(LOCAL_FILE):
-                        df_entry.to_csv(LOCAL_FILE, index=False)
+                        df_e.to_csv(LOCAL_FILE, index=False)
                     else:
-                        df_entry.to_csv(LOCAL_FILE, mode='a', header=False, index=False)
+                        df_e.to_csv(LOCAL_FILE, mode='a', header=False, index=False)
 
+                st.success("✅ Audit enregistré avec succès !")
                 st.session_state['audit_started'] = False
-                st.session_state['audit_success'] = True
-                st.rerun()
 
 with tab_dash:
     st.subheader("Analyse des Performances")
@@ -331,13 +298,12 @@ with tab_dash:
             df = conn.read(ttl="0")
         except Exception:
             pass
-            
     if df is None or df.empty:
         if os.path.exists(LOCAL_FILE):
             df = pd.read_csv(LOCAL_FILE)
 
-    if df is None or df.empty or "Societe" not in df.columns:
-        st.info("Aucune donnée enregistrée pour le moment ou fichier vide.")
+    if df is None or df.empty:
+        st.info("Aucune donnée enregistrée pour le moment.")
     else:
         st.markdown("**Filtrer les données :**")
         c_f1, c_f2 = st.columns(2)
@@ -345,59 +311,49 @@ with tab_dash:
             filter_soc = st.selectbox("Sélectionner la Société :", df["Societe"].unique())
         with c_f2:
             secteurs_dispo = df[df["Societe"] == filter_soc]["Secteur"].unique()
-            if len(secteurs_dispo) > 0:
-                filter_sec = st.selectbox("Sélectionner le Secteur :", secteurs_dispo)
-            else:
-                filter_sec = None
+            filter_sec = st.selectbox("Sélectionner le Secteur :", secteurs_dispo)
 
-        if filter_sec is None:
-            st.warning("Aucun secteur trouvé pour cette société.")
+        df_filtered = df[(df["Societe"] == filter_soc) & (df["Secteur"] == filter_sec)]
+
+        if df_filtered.empty:
+            st.warning("Aucun audit réalisé pour ce croisement.")
         else:
-            df_filtered = df[(df["Societe"] == filter_soc) & (df["Secteur"] == filter_sec)]
+            st.markdown(f"### Histogramme : Dimensions par Activité ({filter_soc} - {filter_sec})")
+            
+            dimensions_cols = [
+                "Vision_Mission_%", "Personnel_%", "Coherence_%", 
+                "Adaptabilite_%", "Conscience_Risques_%"
+            ]
+            
+            df_grouped = df_filtered.groupby("Activite")[dimensions_cols].mean().reset_index()
+            
+            df_melted = df_grouped.melt(
+                id_vars="Activite", 
+                value_vars=dimensions_cols,
+                var_name="Dimension", 
+                value_name="Score Moyen (%)"
+            )
 
-            if df_filtered.empty:
-                st.warning("Aucun audit réalisé pour ce croisement.")
-            else:
-                st.markdown(f"### Histogramme : Dimensions par Activité ({filter_soc} - {filter_sec})")
-                
-                dimensions_cols = [
-                    "Vision_Mission_%", "Personnel_%", "Coherence_%", 
-                    "Adaptabilite_%", "Conscience_Risques_%"
-                ]
-                
-                # Vérifier que toutes les colonnes requises existent dans le DataFrame
-                cols_presentes = [col for col in dimensions_cols if col in df_filtered.columns]
-                
-                df_grouped = df_filtered.groupby("Activite")[cols_presentes].mean().reset_index()
-                
-                df_melted = df_grouped.melt(
-                    id_vars="Activite", 
-                    value_vars=cols_presentes,
-                    var_name="Dimension", 
-                    value_name="Score Moyen (%)"
-                )
+            df_melted["Dimension"] = df_melted["Dimension"].str.replace("_%", "").str.replace("_", " ")
 
-                # Correction du str.replace pour éviter les avertissements
-                df_melted["Dimension"] = df_melted["Dimension"].str.replace("_%", "", regex=False).str.replace("_", " ", regex=False)
-
-                fig = px.bar(
-                    df_melted, 
-                    x="Activite", 
-                    y="Score Moyen (%)", 
-                    color="Dimension", 
-                    barmode="group",
-                    color_discrete_sequence=["#1E3A8A", "#059669", "#D97706", "#DC2626", "#7C3AED"]
-                )
-                fig.update_layout(
-                    plot_bgcolor="white",
-                    paper_bgcolor="white",
-                    font=dict(family="Times New Roman", size=14, color="black"),
-                    yaxis=dict(range=[0, 100], gridcolor="#E2E8F0"),
-                    legend_title_text="Dimensions FSSC 22000"
-                )
-                
-                st.plotly_chart(fig, use_container_width=True)
-                
-                st.markdown("---")
-                st.markdown("### Tableau des données brutes filtrées")
-                st.dataframe(df_filtered)
+            fig = px.bar(
+                df_melted, 
+                x="Activite", 
+                y="Score Moyen (%)", 
+                color="Dimension", 
+                barmode="group",
+                color_discrete_sequence=["#1E3A8A", "#059669", "#D97706", "#DC2626", "#7C3AED"]
+            )
+            fig.update_layout(
+                plot_bgcolor="white",
+                paper_bgcolor="white",
+                font=dict(family="Times New Roman", size=14, color="black"),
+                yaxis=dict(range=[0, 100], gridcolor="#E2E8F0"),
+                legend_title_text="Dimensions FSSC 22000"
+            )
+            
+            st.plotly_chart(fig, use_container_width=True)
+            
+            st.markdown("---")
+            st.markdown("### Tableau des données brutes filtrées")
+            st.dataframe(df_filtered)
