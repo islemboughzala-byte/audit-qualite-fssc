@@ -51,7 +51,7 @@ st.markdown("""
         color: #000000 !important;
     }
 
-    /* Exception : Garder le texte du bouton en blanc pour qu'il soit lisible */
+    /* Exception : Garder le texte du bouton en blanc pour quil soit lisible */
     div.stButton > button, div.stButton > button * {
         background-color: #000000 !important;
         color: #FFFFFF !important;
