@@ -6,7 +6,7 @@ import os
 from datetime import datetime
 
 # -----------------------------------------------------------------------------
-# 1. CONFIGURATION & DESIGN CSS (BLANC, PROFESSIONNEL & ÉPURÉ)
+# 1. CONFIGURATION & DESIGN CSS ( FOND BLANC, TIMES NEW ROMAN, TEXTE NOIR )
 # -----------------------------------------------------------------------------
 st.set_page_config(
     page_title="Audit FSSC 22000",
@@ -17,36 +17,47 @@ st.set_page_config(
 
 st.markdown("""
 <style>
-    /* Fond 100% blanc et typographie sombre */
-    html, body, .stApp {
+    /* Forcer le fond blanc et la police Times New Roman partout */
+    html, body, [class*="css"], .stApp, div, span, p, label {
         background-color: #FFFFFF !important;
-        color: #1E293B !important;
-        font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        color: #000000 !important;
+        font-family: "Times New Roman", Times, serif !important;
+        font-size: 1.1rem !important;
     }
     
-    /* Boutons principaux */
-    .stButton>button {
-        background-color: #0F172A !important;
-        color: #FFFFFF !important;
-        font-weight: 600 !important;
-        border-radius: 6px !important;
-        padding: 10px 24px !important;
-        border: none !important;
-        width: 100%;
-        transition: 0.3s;
-    }
-    .stButton>button:hover {
-        background-color: #334155 !important;
+    /* Titres en noir et Times New Roman */
+    h1, h2, h3, h4, h5, h6 {
+        color: #000000 !important;
+        font-family: "Times New Roman", Times, serif !important;
     }
 
-    /* Style des titres */
-    h1, h2, h3 {
-        color: #0F172A !important;
+    /* Style des boutons */
+    .stButton>button {
+        background-color: #000000 !important;
+        color: #FFFFFF !important;
+        font-family: "Times New Roman", Times, serif !important;
+        font-weight: bold !important;
+        border-radius: 4px !important;
+        padding: 10px 24px !important;
+        border: 1px solid #000000 !important;
+        width: 100%;
     }
-    
-    /* Séparateurs subtils */
+    .stButton>button:hover {
+        background-color: #333333 !important;
+        color: #FFFFFF !important;
+    }
+
+    /* Style des zones de texte et sélecteurs */
+    input, select, textarea {
+        background-color: #FFFFFF !important;
+        color: #000000 !important;
+        border: 1px solid #777777 !important;
+        font-family: "Times New Roman", Times, serif !important;
+    }
+
+    /* Séparateurs */
     hr {
-        border-color: #E2E8F0 !important;
+        border-color: #CCCCCC !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -235,10 +246,9 @@ with tab_form:
 
     st.markdown("---")
 
-    # APPARITION DU QUESTIONNAIRE SEULEMENT SI LE BOUTON A ÉTÉ CLIQUÉ
     if st.session_state.get('audit_started', False):
         p = st.session_state['params']
-        st.info(f"**Audit en cours :** {p['societe']} > {p['secteur']} > {p['activite']} | Profil : {p['profil']}")
+        st.info(f"Audit en cours : {p['societe']} > {p['secteur']} > {p['activite']} | Profil : {p['profil']}")
         
         current_questions = QUESTIONS_PERSONNEL if p['profil'] == "Personnel" else QUESTIONS_RESPONSABLES
         options = ["Oui (100%)", "En partie (50%)", "Non (0%)"]
@@ -297,7 +307,7 @@ with tab_form:
                         df_e.to_csv(LOCAL_FILE, mode='a', header=False, index=False)
 
                 st.success("✅ Audit enregistré avec succès !")
-                st.session_state['audit_started'] = False # Cache le formulaire après enregistrement
+                st.session_state['audit_started'] = False
 
 # --- ONGLET 2 : DASHBOARD STATISTIQUES ---
 with tab_dash:
@@ -316,7 +326,6 @@ with tab_dash:
     if df is None or df.empty:
         st.info("Aucune donnée enregistrée pour le moment.")
     else:
-        # 1. Filtres pour cibler une société et un secteur
         st.markdown("**Filtrer les données :**")
         c_f1, c_f2 = st.columns(2)
         with c_f1:
@@ -325,7 +334,6 @@ with tab_dash:
             secteurs_dispo = df[df["Societe"] == filter_soc]["Secteur"].unique()
             filter_sec = st.selectbox("Sélectionner le Secteur :", secteurs_dispo)
 
-        # Filtrage du dataframe
         df_filtered = df[(df["Societe"] == filter_soc) & (df["Secteur"] == filter_sec)]
 
         if df_filtered.empty:
@@ -333,16 +341,13 @@ with tab_dash:
         else:
             st.markdown(f"### Histogramme : Dimensions par Activité ({filter_soc} - {filter_sec})")
             
-            # Préparation des données pour l'histogramme groupé
             dimensions_cols = [
                 "Vision_Mission_%", "Personnel_%", "Coherence_%", 
                 "Adaptabilite_%", "Conscience_Risques_%"
             ]
             
-            # Moyenne des scores par activité et par dimension
             df_grouped = df_filtered.groupby("Activite")[dimensions_cols].mean().reset_index()
             
-            # Transformation ("Melt") pour Plotly
             df_melted = df_grouped.melt(
                 id_vars="Activite", 
                 value_vars=dimensions_cols,
@@ -350,10 +355,8 @@ with tab_dash:
                 value_name="Score Moyen (%)"
             )
 
-            # Nettoyage des noms de dimensions pour la légende
             df_melted["Dimension"] = df_melted["Dimension"].str.replace("_%", "").str.replace("_", " ")
 
-            # Création de l'histogramme avec Plotly
             fig = px.bar(
                 df_melted, 
                 x="Activite", 
@@ -364,6 +367,8 @@ with tab_dash:
             )
             fig.update_layout(
                 plot_bgcolor="white",
+                paper_bgcolor="white",
+                font=dict(family="Times New Roman", size=14, color="black"),
                 yaxis=dict(range=[0, 100], gridcolor="#E2E8F0"),
                 legend_title_text="Dimensions FSSC 22000"
             )
