@@ -4,64 +4,123 @@ import plotly.express as px
 import plotly.graph_objects as go
 import os
 from datetime import datetime
-from streamlit_gsheets import GSheetsConnection
 
 # -----------------------------------------------------------------------------
-# 1. CONFIGURATION ET STYLES VISUELS (CSS)
+# 1. CONFIGURATION & DESIGN CSS SUR MESURE (LOOK MODERN APP)
 # -----------------------------------------------------------------------------
 st.set_page_config(
-    page_title="Audit Culture Qualité FSSC 22000",
+    page_title="Audit Culture Qualité - FSSC 22000",
     page_icon="🛡️",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
+# Injection CSS avancée pour masquer le look "brut" de Streamlit
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+    
+    /* Police globale et fond */
     html, body, [class*="css"] {
-        font-family: 'Inter', sans-serif;
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        background-color: #F8FAFC;
+        color: #1E293B;
     }
-    .main-header {
-        background: linear-gradient(135deg, #1E3A8A 0%, #059669 100%);
-        padding: 26px;
-        border-radius: 12px;
+    
+    /* Masquer le menu Streamlit et le footer par défaut */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    
+    /* Bannière de secours si pas d'image Canva */
+    .fallback-banner {
+        background: linear-gradient(135deg, #0F172A 0%, #1E3A8A 50%, #059669 100%);
+        padding: 40px 20px;
+        border-radius: 16px;
         color: white;
         text-align: center;
         margin-bottom: 25px;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.12);
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
     }
-    .main-header h1 {
+    .fallback-banner h1 {
         color: #FFFFFF !important;
         font-weight: 700;
-        font-size: 2.1rem;
-        margin-bottom: 6px;
+        font-size: 2.2rem;
+        margin-bottom: 8px;
+        letter-spacing: -0.5px;
     }
-    .main-header p {
-        color: #E2E8F0 !important;
-        font-size: 1.05rem;
+    .fallback-banner p {
+        color: #E2E8F0;
+        font-size: 1.1rem;
         margin: 0;
     }
+
+    /* Style des cartes pour les sections */
+    .css-card {
+        background-color: #FFFFFF;
+        border-radius: 14px;
+        padding: 24px;
+        border: 1px solid #E2E8F0;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+        margin-bottom: 20px;
+    }
+
+    /* Titres de sections */
+    .section-header {
+        color: #1E3A8A;
+        font-weight: 700;
+        font-size: 1.25rem;
+        padding-left: 10px;
+        border-left: 4px solid #059669;
+        margin-top: 15px;
+        margin-bottom: 15px;
+    }
+
+    /* Bouton d'enregistrement principal */
     .stButton>button {
-        background: linear-gradient(90deg, #059669 0%, #047857 100%) !important;
+        background: linear-gradient(135deg, #059669 0%, #047857 100%) !important;
         color: white !important;
+        font-weight: 700 !important;
         font-size: 1.1rem !important;
-        font-weight: 600 !important;
         border-radius: 10px !important;
-        padding: 12px 28px !important;
+        padding: 14px 28px !important;
         border: none !important;
+        box-shadow: 0 4px 12px rgba(5, 150, 105, 0.3) !important;
+        transition: all 0.3s ease !important;
         width: 100%;
-        box-shadow: 0 4px 10px rgba(5, 150, 105, 0.3);
+        margin-top: 20px;
     }
     .stButton>button:hover {
         transform: translateY(-2px);
-        box-shadow: 0 6px 15px rgba(5, 150, 105, 0.4);
+        box-shadow: 0 6px 18px rgba(5, 150, 105, 0.4) !important;
+    }
+
+    /* Personnalisation des onglets */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 12px;
+        background-color: #E2E8F0;
+        padding: 6px;
+        border-radius: 12px;
+    }
+    .stTabs [data-baseweb="tab"] {
+        height: 45px;
+        white-space: pre-wrap;
+        background-color: transparent;
+        border-radius: 8px;
+        color: #475569;
+        font-weight: 600;
+    }
+    .stTabs [aria-selected="true"] {
+        background-color: #FFFFFF !important;
+        color: #1E3A8A !important;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
     }
 </style>
 """, unsafe_allow_html=True)
 
-# Connexion à Google Sheets (avec secours fichier local CSV)
+# Connexion Google Sheets / CSV
 try:
+    from streamlit_gsheets import GSheetsConnection
     conn = st.connection("gsheets", type=GSheetsConnection)
     use_gsheets = True
 except Exception:
@@ -70,10 +129,36 @@ except Exception:
 LOCAL_FILE = "resultats_audit_qualite.csv"
 
 # -----------------------------------------------------------------------------
-# 2. DICTIONNAIRES COMPLETS DES QUESTIONS (34 Personnel + 52 Responsables)
+# 2. DONNÉES : SOCIÉTÉS, DÉPARTEMENTS & QUESTIONS
 # -----------------------------------------------------------------------------
+
+DEPARTEMENTS_PAR_SOCIETE = {
+    "El Mazraa": [
+        "Charcuterie",
+        "Surgelés",
+        "Abattage & Découpe",
+        "Produits Élaborés",
+        "Stockage & Logistique",
+        "Laboratoire / Qualité",
+        "Maintenance & Technique"
+    ],
+    "Société 2": [
+        "Production / Transformation",
+        "Conditionnement",
+        "Stockage & Froid",
+        "Qualité & Hygiène",
+        "Logistique"
+    ],
+    "Société 3": [
+        "Unité de Production",
+        "Emballage & Expédition",
+        "Contrôle Qualité",
+        "Maintenance"
+    ]
+}
+
 QUESTIONS_PERSONNEL = {
-    "1. Vision et Mission": [
+    "1. Vision et mission": [
         "Connaissez-vous la politique de votre entreprise en matière de la sécurité des aliments ?",
         "Avez-vous reçu des connaissances sur la vision et la mission de l'entreprise ?",
         "Pouvez-vous me expliquer la vision et la mission de l'entreprise ?",
@@ -82,7 +167,7 @@ QUESTIONS_PERSONNEL = {
     ],
     "2. Personnel": [
         "Avez-vous suivi un sensibilisation en matière de sécurité des aliments lors des 2 derniers mois ?",
-        "Êtes-vous favorisé(e) à la mise en place d'outils (interne, boîte à suggestions) pour signaler les problèmes ?",
+        "Êtes-vous favorisé(e) à la mise en place d'outils (interne, comme une boîte à suggestions, pour signaler les problèmes et exprimer des idées d'amélioration au sein de l'entreprise) ?",
         "Connaissez-vous les règles relatives aux droits au travail ?",
         "Utilisez-vous des gants lorsque vous touchez les aliments ?",
         "Respectez-vous les protocoles de lavage des mains avant de manipuler les aliments ?",
@@ -105,11 +190,11 @@ QUESTIONS_PERSONNEL = {
     "4. Adaptabilité": [
         "Êtes-vous convoqué à des réunions d'information en cas de changements ou d'évolutions ?",
         "Vous adaptez-vous facilement aux changements ?",
-        "Vous sentez-vous à l'aise d'arrêter la ligne chaque fois que vous constatez quelque chose qui pourrait nuire à la qualité ?",
+        "Vous sentez-vous à l'aise d'arrêter la ligne chaque fois que vous constatez quelque chose qui pourrait nuire à la qualité et à la sécurité des aliments ?",
         "Avez-vous suivi une formation à la suite des nouvelles évolutions (matériel, nouvelles instructions) ?",
         "Avez-vous été informé des procédures d'urgence à suivre en cas d'incident ?"
     ],
-    "5. Connaissance des Dangers et Risques": [
+    "5. Connaissance des dangers et des risques": [
         "Avez-vous reçu une formation sur la gestion des risques et des dangers ?",
         "Savez-vous ce qu'est la contamination croisée ?",
         "Comprenez-vous comment les aliments peuvent être contaminés par des agents physiques, chimiques, microbiologiques ou allergènes ?",
@@ -120,176 +205,189 @@ QUESTIONS_PERSONNEL = {
 }
 
 QUESTIONS_RESPONSABLES = {
-    "1. Vision et Mission": [
-        "Q1.1 : La direction démontre-t-elle son engagement envers la sécurité des aliments (politique, objectifs, ressources) ?",
-        "Q1.2 : L'importance de la politique et les objectifs sont-ils communiqués, compris et appliqués par l'ensemble du personnel ?",
-        "Q1.3 : La direction encourage-t-elle activement l'amélioration continue de la culture via formations/événements ?",
-        "Q2.1 : Les attentes relatives à la sécurité des aliments sont-elles communiquées de manière claire et quotidienne ?",
-        "Q2.2 : Des formations sont-elles organisées régulièrement pour s'assurer de la compréhension des attentes ?",
-        "Q2.3 : Les communications (réunions, affichages, formations) sont-elles régulières et adaptées aux différents niveaux ?",
-        "Q2.4 : La communication est-elle suivie d'une évaluation pour mesurer son efficacité (sondages, évaluations) ?",
-        "Q3.1 : La vision et la mission sont-elles affichées, communiquées et intégrées dans les documents et activités ?",
-        "Q3.2 : Les employés reçoivent-ils une présentation de la vision et mission lors de leur intégration ?",
-        "Q3.3 : Des rappels de la vision/mission sont-ils régulièrement partagés lors de réunions/briefings ?",
-        "Q3.4 : L'entreprise a-t-elle évalué récemment la compréhension et l'adhésion des employés à la mission/vision ?"
+    "1. Vision et mission": [
+        "Q1.1 : La direction démontre-t-elle son engagement envers la sécurité des aliments en définissant une politique, des objectifs clairs et les suit régulièrement en mettant à disposition les ressources nécessaires ?",
+        "Q1.2 : L'importance de la politique et les objectifs de sécurité des aliments sont-ils communiqués, compris et appliqués par l'ensemble du personnel ?",
+        "Q1.3 : La direction encourage-t-elle activement l'amélioration continue de la culture de la sécurité des aliments par la participation à des formations ou des événements liés à la sécurité des aliments ?",
+        "Q2.1 : Les attentes relatives à la sécurité des aliments sont-elles communiquées de manière claire quotidiennement, adaptée et comprise par tous les employés ?",
+        "Q2.2 : Des formations sont-elles organisées régulièrement pour s'assurer que les employés comprennent les attentes en matière de sécurité des aliments ?",
+        "Q2.3 : Les communications sur la sécurité des aliments (réunions, affichage, documents, formations...) sont-elles régulières et adaptées aux différents niveaux de l'entreprise ?",
+        "Q2.4 : La communication de la sécurité des aliments est-elle suivie d'une évaluation pour mesurer son efficacité (par exemple, via des sondages auprès des employés ou des évaluations de compréhension) ?",
+        "Q3.1 : La vision et la mission de l'entreprise sont-elles affichées, communiquées, accessibles et intégrées dans les documents et les activités de l'entreprise ?",
+        "Q3.2 : Les employés reçoivent-ils une présentation de la vision et de la mission lors de leur intégration ou formation initiale ?",
+        "Q3.3 : Des rappels ou des explications de la vision/mission sont-ils régulièrement partagés lors de réunions ou de briefings ?",
+        "Q3.4 : L’entreprise a-t-elle évalué récemment la compréhension ou l’adhésion des employés à la mission et à la vision ?"
     ],
-    "2. Personnel": [
-        "Q7.1 : Existe-t-il un canal formel pour signaler les préoccupations (registre, application, boîte dédiée) connu de tous ?",
-        "Q7.2 : L'environnement encourage-t-il l'expression libre des inquiétudes sans crainte ?",
-        "Q7.3 : Les alertes signalées au cours des 6 derniers mois ont-elles été suivies d'actions correctives concrètes ?",
-        "Q7.4 : Chaque collaborateur est-il conscient de l'impact direct de sa performance individuelle sur la sécurité des aliments ?",
-        "Q8.1 : Avez-vous une mission clairement définie et êtes-vous conscient de l'impact de vos actions quotidiennes ?",
-        "Q8.2 : Appliquez-vous systématiquement les bonnes pratiques et participez-vous aux réunions qualité ?",
-        "Q8.3 : Avez-vous été formé(e) les 12 derniers mois et contribué à sensibiliser vos collègues ?",
-        "Q9.1 : Existe-t-il des indicateurs de performance dédiés suivis à fréquence régulière et communiqués ?",
-        "Q9.2 : Le suivi de performance intègre-t-il la mesure des non-conformités, alertes et réclamations clients ?",
-        "Q9.3 : Les audits évaluent-ils ces performances et les écarts constatés sont-ils analysés ?"
+    "2. Cohérence": [
+        "Q4.1 : Les employés participent-ils à la création, à la mise à jour et à l'amélioration des procédures de sécurité des aliments ?",
+        "Q4.2 : Les suggestions des employés sont-elles valorisées, prises en compte et intégrées dans les processus ?",
+        "Q4.3 : Les instructions de travail sont-elles testées en conditions réelles avec les opérateurs avant validation finale ?",
+        "Q5.1 : Les documents relatifs à la sécurité des aliments sont-ils clairs, régulièrement à jour, communiqués aux personnes concernées et facilement accessibles par les personnels ?",
+        "Q5.2 : La documentation aide-t-elle les employés à prendre les bonnes décisions en cas de doute ou de situation imprévue ?",
+        "Q5.3 : Existe-t-il des supports visuels ou simplifiés pour soutenir la compréhension de la documentation ?",
+        "Q5.4 : Les documents sont-ils conçus pour faciliter la conformité plutôt que pour complexifier les tâches ?",
+        "Q6.1 : Les employés participent-ils à l'amélioration des procédures et les modifications sont-elles communiquées efficacement ?",
+        "Q6.2 : Y a-t-il un mécanisme formel encourageant les employés de proposer des améliorations aux instructions en place ?",
+        "Q6.3 : Y a-t-il une formation spécifique permettant aux employés de comprendre comment contribuer à l’amélioration des protocoles ?",
+        "Q6.4 : Les retours d’audit ou de production sont-ils analysés avec les opérateurs pour ajuster les instructions ?",
+        "Q6.5 : L’implication des employés dans l’amélioration est-elle suivie et mesurée ?"
     ],
-    "3. Cohérence": [
-        "Q4.1 : Les employés participent-ils à la création, mise à jour et amélioration des procédures ?",
-        "Q4.2 : Les suggestions des employés sont-elles valorisées, prises en compte et intégrées ?",
-        "Q4.3 : Les instructions de travail sont-elles testées en conditions réelles avec les opérateurs avant validation ?",
-        "Q5.1 : Les documents sont-ils clairs, régulièrement à jour, communiqués et facilement accessibles ?",
-        "Q5.2 : La documentation aide-t-elle les employés à prendre les bonnes décisions en cas d'imprévu ?",
-        "Q5.3 : Existe-t-il des supports visuels ou simplifiés pour soutenir la compréhension ?",
-        "Q5.4 : Les documents sont-ils conçus pour faciliter la conformité plutôt que complexifier les tâches ?",
-        "Q6.1 : Les employés participent-ils à l'amélioration des procédures et les modifications sont-elles communiquées ?",
-        "Q6.2 : Y a-t-il un mécanisme formel encourageant les employés à proposer des améliorations ?",
-        "Q6.3 : Y a-t-il une formation spécifique permettant aux employés de contribuer à l'amélioration des protocoles ?",
-        "Q6.4 : Les retours d'audit ou de production sont-ils analysés avec les opérateurs ?",
-        "Q6.5 : L'implication des employés dans l'amélioration est-elle suivie et mesurée ?"
+    "3. Personnel": [
+        "Q7.1 : Existe-t-il un canal formel pour signaler les préoccupations (registre, application, boîte dédiée) dont la procédure est connue et maîtrisée par tous les employés ?",
+        "Q7.2 : Votre environnement de travail encourage-t-il l'expression libre des inquiétudes, et les employés se sentent-ils valorisés lorsqu'ils signalent une anomalie ou un risque ?",
+        "Q7.3 : Les alertes signalées au cours des 6 derniers mois ont-elles été suivies d'actions correctives concrètes, et évaluez-vous l'efficacité de ce système pour l'améliorer ?",
+        "Q7.4 : Chaque collaborateur est-il pleinement conscient de l'impact direct de sa performance individuelle et de ses signalements sur la sécurité des aliments ?",
+        "Q8.1 : Avez-vous une mission clairement définie en sécurité des aliments et êtes-vous pleinement conscient de l’impact de vos actions quotidiennes sur la qualité du produit ?",
+        "Q8.2 : Appliquez-vous systématiquement les bonnes pratiques, et participez-vous activement aux réunions qualité ainsi qu’aux actions d’amélioration continue ?",
+        "Q8.3 : Avez-vous été formé(e) au cours des 12 derniers mois, et avez-vous déjà signalé des non-conformités ou contribué à sensibiliser vos collègues aux règles d’hygiène ?",
+        "Q9.1 : Existe-t-il des indicateurs de performance dédiés à la sécurité des aliments, suivis à une fréquence régulière et communiqués aux équipes concernées ?",
+        "Q9.2 : Votre suivi de performance intègre-t-il systématiquement la mesure des non-conformités, des alertes et l'analyse des réclamations clients ?",
+        "Q9.3 : Les audits (internes/externes) évaluent-ils ces performances, et les écarts constatés sont-ils analysés pour ajuster vos indicateurs et vos objectifs ?"
     ],
     "4. Adaptabilité": [
-        "Q10.1 : Votre organisation met-elle en place une veille pour anticiper les évolutions réglementaires ou sectorielles ?",
-        "Q10.2 : Existe-t-il une procédure de gestion du changement intégrée permettant d'évaluer systématiquement les risques ?",
-        "Q10.3 : Utilisez-vous les retours d'expérience pour améliorer vos pratiques et maintenir le plan de gestion de crise ?",
-        "Q10.4 : Des formations/réunions sont-elles organisées lors de l'introduction de nouveaux procédés ou exigences ?",
+        "Q10.1 : Votre organisation met-elle en place une veille pour anticiper les évolutions réglementaires ou sectorielles en sécurité des aliments ?",
+        "Q10.2 : Existe-t-il une procédure de gestion du changement intégrée permettant d'évaluer systématiquement les risques et d'accompagner ces transitions par les formations et sensibilisations nécessaires ?",
+        "Q10.3 : Utilisez-vous les retours d'expérience (leçons apprises des changements passés, efficacité des actions correctives) pour améliorer durablement vos pratiques et maintenir un plan de gestion de crise opérationnel ?",
+        "Q10.4 : Des formations, sensibilisations ou réunions sont-elles organisées lors de l'introduction ou de la mise à jour de nouveaux procédés, produits ou exigences, ainsi qu'en cas de nouvelles exigences ou évolutions ?",
         "Q10.5 : Avez-vous un plan de continuité ou de gestion de crise lié à la sécurité des aliments ?",
-        "Q11.1 : Les décisions opérationnelles intègrent-elles systématiquement les exigences de sécurité des aliments ?",
-        "Q11.2 : Les responsables sont-ils formés et sensibilisés à prendre des décisions conformes ?",
-        "Q11.3 : Les décisions prises et les attentes sont-elles régulièrement revues et communiquées ?",
-        "Q12.1 : L'entreprise dispose-t-elle d'une stratégie documentée pour gérer les situations d'urgence ?",
-        "Q12.2 : Les rôles et responsabilités sont-ils clairement définis et les collaborateurs formés ?",
-        "Q12.3 : Les retours d'expérience sont-ils utilisés pour améliorer la stratégie FSSC 22000 ?",
-        "Q12.4 : Des exercices ou des simulations de crise sont-ils réalisés régulièrement ?"
+        "Q11.1 : Les décisions opérationnelles intègrent-elles systématiquement les exigences de sécurité des aliments (nouveaux produits, changements de procédé, etc.) ?",
+        "Q11.2 : Les responsables sont-ils formés et sensibilisés à prendre des décisions conformes aux exigences de sécurité des aliments ?",
+        "Q11.3 : Les décisions prises et les attentes en matière de sécurité des aliments sont-elles régulièrement revues et communiquées en cas de changement ?",
+        "Q12.1 : L’entreprise dispose-t-elle d’une stratégie documentée pour gérer les situations d’urgence ou les changements critiques liés à la sécurité des aliments ?",
+        "Q12.2 : Les rôles et responsabilités sont-ils clairement définis, et les collaborateurs concernés sont-ils formés à appliquer cette stratégie ?",
+        "Q12.3 : Les retours d’expérience sont-ils utilisés pour améliorer la stratégie et maintenir la conformité aux exigences FSSC 22000 ?",
+        "Q12.4 : Des exercices ou des simulations sont-ils réalisés, et l’entreprise est-elle capable de réagir efficacement en cas d’incident ou d’alerte ?"
     ],
-    "5. Connaissance des Dangers et Risques": [
-        "Q13.1 : Existe-t-il une procédure documentée pour signaler, enregistrer et analyser les quasi-accidents ?",
-        "Q13.2 : Les collaborateurs sont-ils formés et encouragés à identifier et signaler les risques ?",
-        "Q13.3 : Les analyses des quasi-accidents permettent-elles de mettre en œuvre des actions préventives efficaces ?",
-        "Q13.4 : Les actions mises en place sont-elles suivies et évaluées pour prévenir la récurrence ?",
-        "Q14.1 : L'entreprise dispose-t-elle d'un système pour promouvoir, suivre et évaluer l'engagement du personnel ?",
-        "Q14.2 : Les responsables montrent-ils l'exemple et soutiennent-ils le signalement des risques ?",
-        "Q14.3 : Les comportements non conformes sont-ils corrigés et les initiatives positives valorisées ?"
+    "5. Connaissance des dangers et des risques": [
+        "Q13.1 : L’entreprise dispose-t-elle d’une procédure documentée pour signaler, enregistrer et analyser les quasi-accidents, les non-conformités ou les risques liés à la sécurité des aliments ?",
+        "Q13.2 : Les collaborateurs sont-ils formés et encouragés à identifier et signaler les risques liés à la sécurité des aliments ?",
+        "Q13.3 : Les analyses des quasi-accidents et des non-conformités permettent-elles de mettre en œuvre des actions correctives et préventives efficaces ?",
+        "Q13.4 : Les actions mises en place sont-elles suivies et évaluées afin de prévenir la récurrence des incidents et d’améliorer le système de sécurité des aliments ?",
+        "Q14.1 : L’entreprise dispose-t-elle d’un système permettant de promouvoir, suivre et évaluer l’engagement du personnel en matière de sécurité des aliments ?",
+        "Q14.2 : Les responsables montrent-ils l’exemple, et les employés sont-ils encouragés et soutenus pour signaler les risques, poser des questions et proposer des améliorations ?",
+        "Q14.3 : Les comportements non conformes sont-ils rapidement corrigés, les initiatives positives valorisées et l’engagement maintenu de manière homogène dans tous les services ?"
     ]
 }
 
 # -----------------------------------------------------------------------------
-# 3. EN-TÊTE DE L'APPLICATION
+# 3. AFFICHAGE DE LA BANNIÈRE (CANVA OU SECOURS)
 # -----------------------------------------------------------------------------
-st.markdown("""
-<div class="main-header">
-    <h1>Évaluation de la Culture Sécurité des Aliments</h1>
-    <p>Référentiel FSSC 22000 / ISO 22000 — Grille d'Évaluation Opérateurs & Responsables</p>
-</div>
-""", unsafe_allow_html=True)
+if os.path.exists("banner.png"):
+    st.image("banner.png", use_container_width=True)
+elif os.path.exists("banner.jpg"):
+    st.image("banner.jpg", use_container_width=True)
+else:
+    st.markdown("""
+    <div class="fallback-banner">
+        <h1>Évaluation de la Culture Sécurité des Aliments</h1>
+        <p>Référentiel FSSC 22000 — Diagnostic Multi-Sociétés & Multi-Départements</p>
+    </div>
+    """, unsafe_allow_html=True)
 
-tab_form, tab_dash = st.tabs(["📋 Saisie du Questionnaire", "📊 Dashboard & Statistiques Globales"])
+tab_form, tab_dash = st.tabs(["📋 Formulaire d'Audit", "📊 Dashboard & Statistiques"])
 
 # -----------------------------------------------------------------------------
-# ONGLET 1 : SAISIE DU QUESTIONNAIRE
+# 4. ONGLET 1 : FORMULAIRE D'AUDIT
 # -----------------------------------------------------------------------------
 with tab_form:
-    st.subheader("📝 Formulaire d'Évaluation Terrain")
+    st.markdown("<div class='section-header'>1. Informations Générales</div>", unsafe_allow_html=True)
     
-    with st.form("audit_form_full", clear_on_submit=True):
-        col_m1, col_m2, col_m3 = st.columns(3)
-        with col_m1:
-            evaluateur = st.text_input("Nom / Matricule Évaluateur", placeholder="Ex: Mohamed Ben Ali")
-        with col_m2:
+    with st.form("audit_form_main", clear_on_submit=True):
+        c1, c2, c3, c4 = st.columns(4)
+        
+        with c1:
+            evaluateur = st.text_input("Nom / Matricule Évaluateur", placeholder="Ex: Ben Ali")
+            
+        with c2:
+            societe = st.selectbox("Société", list(DEPARTEMENTS_PAR_SOCIETE.keys()))
+            
+        with c3:
+            departement_options = DEPARTEMENTS_PAR_SOCIETE[societe]
+            departement = st.selectbox("Département / Secteur", departement_options)
+            
+        with c4:
             profil = st.selectbox("Profil Évalué", ["Personnel / Opérateur", "Responsable / Cadre"])
-        with col_m3:
-            atelier = st.selectbox("Atelier / Secteur", ["Préparation", "Cuisson", "Conditionnement", "Stockage & Logistique", "Laboratoire / Qualité", "Direction"])
 
-        st.markdown("---")
-        
-        # Choix du dictionnaire selon le profil
         current_questions = QUESTIONS_PERSONNEL if profil == "Personnel / Opérateur" else QUESTIONS_RESPONSABLES
+        total_q = sum(len(q) for q in current_questions.values())
         
-        st.info(f"💡 Vous remplissez la grille pour : **{profil}** ({sum(len(q) for q in current_questions.values())} questions au total).")
+        st.info(f"💡 **Questionnaire chargé :** {societe} — Sector : **{departement}** | Profil : **{profil}** ({total_q} questions)")
 
-        responses = {}
         options = ["Oui (100%)", "En partie (50%)", "Non (0%)"]
-
-        # Affichage structuré par Dimension
         dim_scores = {}
-        
-        for dim_name, q_list in current_questions.items():
-            with st.expander(f"📌 {dim_name} ({len(q_list)} questions)", expanded=True):
-                dim_numeric_scores = []
-                for idx, q_text in enumerate(q_list):
-                    q_key = f"{profil}_{dim_name}_{idx}"
-                    ans = st.radio(f"**{idx+1}.** {q_text}", options, index=0, horizontal=True, key=q_key)
-                    
-                    val = 100 if ans == "Oui (100%)" else (50 if ans == "En partie (50%)" else 0)
-                    dim_numeric_scores.append(val)
-                
-                dim_scores[dim_name] = sum(dim_numeric_scores) / len(dim_numeric_scores)
 
-        st.markdown("---")
-        commentaires = st.text_area("Observations & Remarques Terrain", placeholder="Ex: Besoins de révisions des affichages d'hygiène au poste 3...")
-        
-        submitted = st.form_submit_button("💾 Enregistrer l'Audit dans la Base de Données")
+        st.markdown("<div class='section-header'>2. Évaluation des Dimensions</div>", unsafe_allow_html=True)
+
+        for dim_name, q_list in current_questions.items():
+            st.markdown(f"#### 📌 {dim_name}")
+            numeric_scores = []
+            
+            for idx, q_text in enumerate(q_list):
+                key_id = f"{societe}_{departement}_{profil}_{dim_name}_{idx}"
+                ans = st.radio(f"**{idx+1}.** {q_text}", options, index=0, horizontal=True, key=key_id)
+                
+                val = 100 if ans == "Oui (100%)" else (50 if ans == "En partie (50%)" else 0)
+                numeric_scores.append(val)
+                
+            dim_scores[dim_name] = sum(numeric_scores) / len(numeric_scores)
+            st.markdown("---")
+
+        # Zone de remarques conservée
+        st.markdown("<div class='section-header'>3. Remarques & Observations Terrain</div>", unsafe_allow_html=True)
+        commentaires = st.text_area(
+            "Observations, points forts ou opportunités d'amélioration constatés pendant l'entretien :",
+            placeholder="Ex : Très bonne maîtrise des procédures d'hygiène, matériel bien entretenu..."
+        )
+
+        submitted = st.form_submit_button("💾 Enregistrer l'Audit")
 
         if submitted:
             if not evaluateur:
-                st.error("⚠️ Veuillez indiquer le nom ou le matricule de l'évaluateur.")
+                st.error("⚠️ Veuillez renseigner le nom ou le matricule de l'évaluateur avant de valider.")
             else:
-                # Calcul des sous-scores
-                global_score = sum(dim_scores.values()) / len(dim_scores)
+                score_global = sum(dim_scores.values()) / len(dim_scores)
 
                 entry = {
                     "Date": datetime.now().strftime("%Y-%m-%d %H:%M"),
                     "Evaluateur": evaluateur,
+                    "Societe": societe,
+                    "Departement": departement,
                     "Profil": profil,
-                    "Atelier": atelier,
-                    "Score_Global_%": round(global_score, 1),
-                    "Vision_Mission_%": round(dim_scores.get("1. Vision et Mission", 0), 1),
-                    "Personnel_%": round(dim_scores.get("2. Personnel", 0), 1),
-                    "Coherence_%": round(dim_scores.get("3. Cohérence", 0), 1),
+                    "Score_Global_%": round(score_global, 1),
+                    "Vision_Mission_%": round(dim_scores.get("1. Vision et mission", 0), 1),
+                    "Personnel_%": round(dim_scores.get("2. Personnel", 0) if profil == "Personnel / Opérateur" else dim_scores.get("3. Personnel", 0), 1),
+                    "Coherence_%": round(dim_scores.get("3. Cohérence", 0) if profil == "Personnel / Opérateur" else dim_scores.get("2. Cohérence", 0), 1),
                     "Adaptabilite_%": round(dim_scores.get("4. Adaptabilité", 0), 1),
-                    "Conscience_Risques_%": round(dim_scores.get("5. Connaissance des Dangers et Risques", 0), 1),
-                    "Commentaires": commentaires
+                    "Conscience_Risques_%": round(dim_scores.get("5. Connaissance des dangers et des risques", 0), 1),
+                    "Remarques_Observations": commentaires
                 }
 
-                # Sauvegarde Google Sheets ou Local
-                saved_successfully = False
+                saved = False
                 if use_gsheets:
                     try:
                         df_existing = conn.read(ttl="0")
                         df_updated = pd.concat([df_existing, pd.DataFrame([entry])], ignore_index=True)
                         conn.update(data=df_updated)
-                        saved_successfully = True
+                        saved = True
                     except Exception:
                         pass
                 
-                if not saved_successfully:
-                    df_entry = pd.DataFrame([entry])
+                if not saved:
+                    df_e = pd.DataFrame([entry])
                     if not os.path.exists(LOCAL_FILE):
-                        df_entry.to_csv(LOCAL_FILE, index=False)
+                        df_e.to_csv(LOCAL_FILE, index=False)
                     else:
-                        df_entry.to_csv(LOCAL_FILE, mode='a', header=False, index=False)
+                        df_e.to_csv(LOCAL_FILE, mode='a', header=False, index=False)
 
-                st.success("✅ Audit enregistré avec succès dans la base de données !")
+                st.success(f"✅ Audit enregistré avec succès pour {societe} ({departement}) !")
                 st.balloons()
 
 # -----------------------------------------------------------------------------
-# ONGLET 2 : DASHBOARD INTERACTIF ET GRAPHISTIQUES
+# 5. ONGLET 2 : DASHBOARD & STATISTIQUES
 # -----------------------------------------------------------------------------
 with tab_dash:
-    st.subheader("📊 Tableau de Bord Synthetique - Culture Qualité FSSC 22000")
+    st.markdown("<div class='section-header'>Tableau de Bord Synthetique</div>", unsafe_allow_html=True)
 
-    # Chargement des données
     df = None
     if use_gsheets:
         try:
@@ -302,96 +400,75 @@ with tab_dash:
             df = pd.read_csv(LOCAL_FILE)
 
     if df is None or df.empty:
-        st.info("ℹ️ Aucune donnée disponible. Veuillez remplir au moins un questionnaire.")
+        st.info("ℹ️ Aucun audit n'a encore été enregistré. Complétez le formulaire pour alimenter les statistiques.")
     else:
         # Filtres
-        c_f1, c_f2 = st.columns(2)
-        with c_f1:
-            filter_atelier = st.selectbox("Filtrer par Atelier", ["Tous les ateliers"] + list(df["Atelier"].unique()))
-        with c_f2:
-            filter_profil = st.selectbox("Filtrer par Profil", ["Tous les profils"] + list(df["Profil"].unique()))
+        f1, f2, f3 = st.columns(3)
+        with f1:
+            sel_soc = st.selectbox("Société", ["Toutes"] + list(df["Societe"].unique()))
+        with f2:
+            sel_dep = st.selectbox("Département", ["Tous"] + list(df["Departement"].unique()))
+        with f3:
+            sel_prof = st.selectbox("Profil", ["Tous"] + list(df["Profil"].unique()))
 
-        filtered_df = df.copy()
-        if filter_atelier != "Tous les ateliers":
-            filtered_df = filtered_df[filtered_df["Atelier"] == filter_atelier]
-        if filter_profil != "Tous les profils":
-            filtered_df = filtered_df[filtered_df["Profil"] == filter_profil]
+        filtered = df.copy()
+        if sel_soc != "Toutes":
+            filtered = filtered[filtered["Societe"] == sel_soc]
+        if sel_dep != "Tous":
+            filtered = filtered[filtered["Departement"] == sel_dep]
+        if sel_prof != "Tous":
+            filtered = filtered[filtered["Profil"] == sel_prof]
 
-        if filtered_df.empty:
-            st.warning("Aucun résultat ne correspond à ces filtres.")
+        if filtered.empty:
+            st.warning("Aucune donnée ne correspond aux filtres sélectionnés.")
         else:
-            avg_global = filtered_df["Score_Global_%"].mean()
-            avg_vm = filtered_df["Vision_Mission_%"].mean()
-            avg_pers = filtered_df["Personnel_%"].mean()
-            avg_coh = filtered_df["Coherence_%"].mean()
-            avg_adapt = filtered_df["Adaptabilite_%"].mean()
-            avg_dangers = filtered_df["Conscience_Risques_%"].mean()
-
-            # Métriques
-            m1, m2, m3, m4 = st.columns(4)
-            m1.metric("Audits Réalisés", len(filtered_df))
-            m2.metric("Maturité Globale", f"{avg_global:.1f} %", delta=f"{avg_global-80:.1f}% vs Obj 80%")
-            m3.metric("Dimension Fort", "Vision & Mission" if avg_vm >= max(avg_pers, avg_coh, avg_adapt, avg_dangers) else "Conscience Risques")
-            m4.metric("Dernière Saisie", str(filtered_df["Date"].iloc[-1]))
+            avg_g = filtered["Score_Global_%"].mean()
+            
+            m1, m2, m3 = st.columns(3)
+            m1.metric("Audits Réalisés", len(filtered))
+            m2.metric("Score Moyen Global", f"{avg_g:.1f} %")
+            m3.metric("Seuil FSSC 22000", "80.0 %", delta=f"{avg_g-80:.1f}%")
 
             st.markdown("---")
 
-            # Graphiques Plotly
-            col_g1, col_g2 = st.columns(2)
+            g1, g2 = st.columns(2)
 
-            with col_g1:
-                fig_gauge = go.Figure(go.Indicator(
-                    mode="gauge+number",
-                    value=avg_global,
-                    title={'text': "Taux de Maturité Globale (%)", 'font': {'size': 18}},
-                    gauge={
-                        'axis': {'range': [0, 100]},
-                        'bar': {'color': "#059669"},
-                        'steps': [
-                            {'range': [0, 50], 'color': "#FEE2E2"},
-                            {'range': [50, 75], 'color': "#FEF3C7"},
-                            {'range': [75, 100], 'color': "#D1FAE5"}
-                        ],
-                        'threshold': {'line': {'color': "red", 'width': 4}, 'value': 80}
-                    }
-                ))
-                fig_gauge.update_layout(height=350, margin=dict(l=20, r=20, t=50, b=20))
-                st.plotly_chart(fig_gauge, use_container_width=True)
-
-            with col_g2:
-                categories = ['Vision & Mission', 'Personnel', 'Cohérence', 'Adaptabilité', 'Risques & Dangers']
-                scores = [avg_vm, avg_pers, avg_coh, avg_adapt, avg_dangers]
-
-                fig_radar = go.Figure()
-                fig_radar.add_trace(go.Scatterpolar(
-                    r=scores + [scores[0]],
-                    theta=categories + [categories[0]],
+            with g1:
+                cats = ['Vision & Mission', 'Personnel', 'Cohérence', 'Adaptabilité', 'Risques']
+                scs = [
+                    filtered["Vision_Mission_%"].mean(),
+                    filtered["Personnel_%"].mean(),
+                    filtered["Coherence_%"].mean(),
+                    filtered["Adaptabilite_%"].mean(),
+                    filtered["Conscience_Risques_%"].mean()
+                ]
+                
+                fig_r = go.Figure()
+                fig_r.add_trace(go.Scatterpolar(
+                    r=scs + [scs[0]],
+                    theta=cats + [cats[0]],
                     fill='toself',
-                    name='Culture Qualité',
-                    line_color='#1E3A8A',
-                    fillcolor='rgba(30, 58, 138, 0.25)'
+                    fillcolor='rgba(5, 150, 105, 0.2)',
+                    line_color='#059669'
                 ))
-                fig_radar.update_layout(
-                    polar=dict(radialaxis=dict(visible=True, range=[0, 100])),
-                    showlegend=False,
-                    title="Profil Radar FSSC 22000 (5 Dimensions)",
-                    height=350,
-                    margin=dict(l=40, r=40, t=50, b=20)
+                fig_r.update_layout(
+                    polar=dict(radialaxis=dict(range=[0, 100])),
+                    title="<b>Niveau de Maturité par Axe (%)</b>",
+                    showlegend=False
                 )
-                st.plotly_chart(fig_radar, use_container_width=True)
+                st.plotly_chart(fig_r, use_container_width=True)
 
-            # Bar Chart comparatif par Atelier
-            st.markdown("#### 🏭 Comparatif par Atelier")
-            df_at = filtered_df.groupby("Atelier")["Score_Global_%"].mean().reset_index()
-            fig_bar = px.bar(
-                df_at, x="Atelier", y="Score_Global_%",
-                color="Score_Global_%", color_continuous_scale="Viridis",
-                text_auto='.1f', title="Maturité Moyenne par Atelier (%)"
-            )
-            fig_bar.update_layout(height=320, yaxis_range=[0, 100])
-            st.plotly_chart(fig_bar, use_container_width=True)
+            with g2:
+                df_dep = filtered.groupby("Departement")["Score_Global_%"].mean().reset_index()
+                fig_b = px.bar(
+                    df_dep, x="Departement", y="Score_Global_%",
+                    color="Score_Global_%", text_auto='.1f',
+                    title="<b>Score Moyen par Département (%)</b>",
+                    color_continuous_scale="Blues"
+                )
+                fig_b.update_layout(yaxis_range=[0, 100], showlegend=False)
+                st.plotly_chart(fig_b, use_container_width=True)
 
-            # Table des résultats
             st.markdown("---")
-            st.markdown("#### 📜 Historique Complet des Enregistrements")
-            st.dataframe(filtered_df, use_container_width=True)
+            st.markdown("#### 📜 Historique complet des saisies & remarques")
+            st.dataframe(filtered, use_container_width=True)
