@@ -255,9 +255,18 @@ with tab_dash:
         if os.path.exists(LOCAL_FILE):
             df = pd.read_csv(LOCAL_FILE)
 
-    if df is None or df.empty:
-        st.info("Aucune donnée enregistrée pour le moment.")
+    if df is None or df.empty or len(df.columns) <= 1:
+        st.info("Aucune donnée enregistrée pour le moment (ou tableau Google Sheets vide).")
     else:
+        # Nettoyage et conversion forcée des colonnes de scores en chiffres
+        dimensions_cols = [
+            "Vision_Mission_%", "Personnel_%", "Coherence_%", 
+            "Adaptabilite_%", "Conscience_Risques_%"
+        ]
+        for col in dimensions_cols:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+
         st.markdown("**Filtrer les données :**")
         c_f1, c_f2 = st.columns(2)
         with c_f1:
@@ -272,11 +281,6 @@ with tab_dash:
             st.warning("Aucun audit réalisé pour ce croisement.")
         else:
             st.markdown(f"### Histogramme : Dimensions par Activité ({filter_soc} - {filter_sec})")
-            
-            dimensions_cols = [
-                "Vision_Mission_%", "Personnel_%", "Coherence_%", 
-                "Adaptabilite_%", "Conscience_Risques_%"
-            ]
             
             df_grouped = df_filtered.groupby("Activite")[dimensions_cols].mean().reset_index()
             
