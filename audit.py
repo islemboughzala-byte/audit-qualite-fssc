@@ -17,8 +17,8 @@ st.markdown("""
 <style>
     .stApp { background-color: #FFFFFF !important; font-family: "Times New Roman", Times, serif !important; color: #000000 !important; }
     h1, h2, h3, h4, p, label, span { font-family: "Times New Roman", Times, serif !important; color: #000000 !important; }
-    .stButton>button { background-color: #000000 !important; color: #FFFFFF !important; font-family: "Times New Roman", Times, serif !important; font-weight: bold !important; border-radius: 4px !important; padding: 10px 24px !important; width: 100%; }
-    .stButton>button:hover { background-color: #333333 !important; color: #FFFFFF !important; }
+    .stButton>button { background-color: #30f04e !important; color: #FFFFFF !important; font-family: "Times New Roman", Times, serif !important; font-weight: bold !important; border-radius: 4px !important; padding: 10px 24px !important; width: 100%; }
+    .stButton>button:hover { background-color: #25b03b !important; color: #FFFFFF !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -174,7 +174,7 @@ with tab_form:
         activite = st.selectbox("Activité spécifique :", ACTIVITES[secteur])
         profil = st.selectbox("Profil audité :", ["Personnel", "Responsable"])
 
-    if st.button("🚀 Commencer l'audit avec ces paramètres"):
+    if st.button(" Commencer l'audit avec ces paramètres"):
         if not evaluateur:
             st.error("Veuillez saisir le nom de l'évaluateur avant de commencer.")
         else:
@@ -211,7 +211,7 @@ with tab_form:
                 st.markdown("<br>", unsafe_allow_html=True)
             
             commentaires = st.text_area("Remarques et Observations :")
-            submitted = st.form_submit_button("💾 Enregistrer les résultats")
+            submitted = st.form_submit_button("Enregistrer les résultats")
 
             if submitted:
                 score_global = sum(dim_scores.values()) / len(dim_scores)
@@ -235,13 +235,13 @@ with tab_form:
                 try:
                     response = requests.post(APPS_SCRIPT_URL, json=entry)
                     if response.status_code == 200:
-                        st.success("✅ Audit enregistré avec succès dans Google Sheets !")
+                        st.success(" Audit enregistré avec succès dans Google Sheets !")
                     else:
                         st.warning("⚠️ Sauvegardé en local (erreur de liaison Google Sheet).")
                         pd.DataFrame([entry]).to_csv(LOCAL_FILE, mode='a', header=not os.path.exists(LOCAL_FILE), index=False)
                 except Exception:
                     pd.DataFrame([entry]).to_csv(LOCAL_FILE, mode='a', header=not os.path.exists(LOCAL_FILE), index=False)
-                    st.success("✅ Audit enregistré en local !")
+                    st.success("Audit enregistré en local !")
 
                 st.session_state['audit_started'] = False
 
@@ -305,7 +305,7 @@ with tab_dash:
                 plot_bgcolor="white",
                 paper_bgcolor="white",
                 font=dict(family="Times New Roman", size=14, color="black"),
-                yaxis=dict(range=[0, 100], gridcolor="#E2E8F0"),
+                yaxis=dict(range=[0, 100], gridcolor="black"),
                 legend_title_text="Dimensions FSSC 22000"
             )
             
