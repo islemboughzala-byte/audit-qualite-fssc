@@ -310,7 +310,20 @@ with tab_dash:
             )
             
             st.plotly_chart(fig, use_container_width=True)
-            
+                    # ===== BOUTON POUR EXPORTER EN CSV =====
+        st.markdown("### 📥 Exporter les données")
+        
+        # Convertir les données en CSV
+        csv_data = df_filtered.to_csv(index=False)
+        
+        # Bouton de téléchargement
+        st.download_button(
+            label=" Télécharger en CSV (ouvre dans Excel)",
+            data=csv_data,
+            file_name=f"audit_{filter_soc}_{filter_sec}.csv",
+            mime="text/csv"
+        )
+        # ===== FIN =====
             st.markdown("---")
             st.markdown("### Tableau des données brutes filtrées")
             st.dataframe(df_filtered)
