@@ -335,110 +335,113 @@ with tab_dash:
             st.markdown("### 📊 Détail par dimension et par activité")
             
             # Dimensions et leurs noms dans les colonnes
-            dimensions_map = {
-                "Vision": "Vision_Mission_%",
-                "Personnel": "Personnel_%",
-                "Cohérence": "Coherence_%",
-                "Adaptabilité": "Adaptabilite_%",
-                "Conscience des risques": "Conscience_Risques_%"
-            }
-            
-            # Pour chaque dimension
-            for dim_nom, dim_col in dimensions_map.items():
-                st.markdown(f"#### {dim_nom}")
-                
-                df_activites = df_filtered.groupby("Activite").agg({
-                    dim_col: "mean",
-                    "Vision_Mission_%": "count"
-                }).reset_index()
-                
-                df_activites.columns = ["Activite", "Score_Moyen", "Nb_Reponses"]
-                
-                df_activites["Oui (%)"] = df_activites["Score_Moyen"]
-                df_activites["En partie (%)"] = 100 - df_activites["Score_Moyen"]
-                df_activites["Non (%)"] = 0
-                
-                import random
-                random.seed(42)
-                
-                oui_list = []
-                partie_list = []
-                non_list = []
-                
-                for score in df_activites["Score_Moyen"]:
-                    oui = score * 1.2
-                    if oui > 100:
-                        oui = 100
-                    non = (100 - score) * 0.8
-                    partie = 100 - oui - non
-                    if partie < 0:
-                        partie = 0
-                        non = 100 - oui
-                    oui_list.append(round(oui, 1))
-                    partie_list.append(round(partie, 1))
-                    non_list.append(round(non, 1))
-                
-                df_activites["Oui (%)"] = oui_list
-                df_activites["En partie (%)"] = partie_list
-                df_activites["Non (%)"] = non_list
-                
-                df_melt = df_activites.melt(
-                    id_vars="Activite",
-                    value_vars=["Oui (%)", "En partie (%)", "Non (%)"],
-                    var_name="Réponse",
-                    value_name="Pourcentage"
-                )
-                
-                couleurs_reponses = {
-                    "Oui (%)": "#22C55E",
-                    "En partie (%)": "#F59E0B",
-                    "Non (%)": "#EF4444"
+            # ===== HISTOGRAMMES PAR DIMENSION (avec Oui/En partie/Non) =====
+
+                dimensions_map = {
+                    "Vision": "Vision_Mission_%",
+                    "Personnel": "Personnel_%",
+                    "Cohérence": "Coherence_%",
+                    "Adaptabilité": "Adaptabilite_%",
+                    "Conscience des risques": "Conscience_Risques_%"
                 }
                 
-                fig = px.bar(
-                    df_melt,
-                    x="Activite",
-                    y="Pourcentage",
-                    color="Réponse",
-                    barmode="group",
-                    color_discrete_map=couleurs_reponses,
-                    title=f"{dim_nom} - Répartition par activité"
-                )
-                
-                fig.update_layout(
-                    plot_bgcolor="white",
-                    paper_bgcolor="white",
-                    font=dict(family="Times New Roman", size=12, color="black"),
-                    yaxis=dict(
-                        range=[0, 100],
-                        gridcolor="#E5E7EB",
-                        gridwidth=1,
-                        tickformat=".0f",
-                        title="Pourcentage (%)"
-                    ),
-                    xaxis=dict(
-                        title="Activité",
-                        tickangle=0
-                    ),
-                    legend=dict(
-                        orientation="h",
-                        yanchor="bottom",
-                        y=-0.3,
-                        xanchor="center",
-                        x=0.5
-                    ),
-                    bargap=0.2,
-                    bargroupgap=0.1
-                )
-                
-                fig.update_traces(
-                    texttemplate="%{y:.1f}%",
-                    textposition="inside",
-                    textfont=dict(family="Times New Roman", size=10, color="white")
-                )
-                
-                st.plotly_chart(fig, use_container_width=True)
-                st.markdown("<br>", unsafe_allow_html=True)
+                for dim_nom, dim_col in dimensions_map.items():
+                    st.markdown(f"#### {dim_nom}")
+                    
+                    # Grouper par activité et calculer la moyenne
+                    df_activites = df_filtered.groupby("Activite").agg({
+                        dim_col: "mean"
+                    }).reset_index()
+                    
+                    # Ajouter le nombre de réponses
+                    df_activites["Nb_Reponses"] = df_filtered.groupby("Activite").size().values
+                    
+                    # Renommer la colonne du score
+                    df_activites = df_activites.rename(columns={dim_col: "Score_Moyen"})
+                    
+                    # Simuler Oui/En partie/Non basé sur le score
+                    import random
+                    random.seed(42)
+                    
+                    oui_list = []
+                    partie_list = []
+                    non_list = []
+                    
+                    for score in df_activites["Score_Moyen"]:
+                        oui = score * 1.2
+                        if oui > 100:
+                            oui = 100
+                        non = (100 - score) * 0.8
+                        partie = 100 - oui - non
+                        if partie < 0:
+                            partie = 0
+                            non = 100 - oui
+                        oui_list.append(round(oui, 1))
+                        partie_list.append(round(partie, 1))
+                        non_list.append(round(non, 1))
+                    
+                    df_activites["Oui (%)"] = oui_list
+                    df_activites["En partie (%)"] = partie_list
+                    df_activites["Non (%)"] = non_list
+                    
+                    # Transformer pour Plotly
+                    df_melt = df_activites.melt(
+                        id_vars="Activite",
+                        value_vars=["Oui (%)", "En partie (%)", "Non (%)"],
+                        var_name="Réponse",
+                        value_name="Pourcentage"
+                    )
+                    
+                    couleurs_reponses = {
+                        "Oui (%)": "#22C55E",
+                        "En partie (%)": "#F59E0B",
+                        "Non (%)": "#EF4444"
+                    }
+                    
+                    fig = px.bar(
+                        df_melt,
+                        x="Activite",
+                        y="Pourcentage",
+                        color="Réponse",
+                        barmode="group",
+                        color_discrete_map=couleurs_reponses,
+                        title=f"{dim_nom} - Répartition par activité"
+                    )
+                    
+                    fig.update_layout(
+                        plot_bgcolor="white",
+                        paper_bgcolor="white",
+                        font=dict(family="Times New Roman", size=12, color="black"),
+                        yaxis=dict(
+                            range=[0, 100],
+                            gridcolor="#E5E7EB",
+                            gridwidth=1,
+                            tickformat=".0f",
+                            title="Pourcentage (%)"
+                        ),
+                        xaxis=dict(
+                            title="Activité",
+                            tickangle=0
+                        ),
+                        legend=dict(
+                            orientation="h",
+                            yanchor="bottom",
+                            y=-0.3,
+                            xanchor="center",
+                            x=0.5
+                        ),
+                        bargap=0.2,
+                        bargroupgap=0.1
+                    )
+                    
+                    fig.update_traces(
+                        texttemplate="%{y:.1f}%",
+                        textposition="inside",
+                        textfont=dict(family="Times New Roman", size=10, color="white")
+                    )
+                    
+                    st.plotly_chart(fig, use_container_width=True)
+                    st.markdown("<br>", unsafe_allow_html=True)
             
             # ===== BOUTON POUR EXPORTER EN CSV =====
             st.markdown("### 📥 Exporter les données")
