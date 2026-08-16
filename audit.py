@@ -276,7 +276,7 @@ with tab_dash:
             filter_sec = st.selectbox("Secteur :", secteurs_dispo)
         with c_f3:
             profil_dispo = df[df["Societe"] == filter_soc]["Profil"].unique()
-            filter_profil = st.selectbox("Profil audité :", profil_dispo)  # ← NOUVEAU
+            filter_profil = st.selectbox("Profil à analyser :", profil_dispo)  # ← NOUVEAU
 
         df_filtered = df[(df["Societe"] == filter_soc) & (df["Secteur"] == filter_sec) & (df["Profil"] == filter_profil)]
         if df_filtered.empty:
