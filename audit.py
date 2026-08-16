@@ -324,6 +324,6 @@ with tab_dash:
             mime="text/csv"
         )
         # ===== FIN =====
-            st.markdown("---")
-            st.markdown("### Tableau des données brutes filtrées")
-            st.dataframe(df_filtered)
+        st.markdown("---")
+        st.markdown("### Tableau des données brutes filtrées")
+        st.dataframe(df_filtered)
