@@ -279,11 +279,10 @@ with tab_dash:
             filter_profil = st.selectbox("Profil audité :", profil_dispo)  # ← NOUVEAU
 
         df_filtered = df[(df["Societe"] == filter_soc) & (df["Secteur"] == filter_sec) & (df["Profil"] == filter_profil)]
-       if df_filtered.empty:
+        if df_filtered.empty:
             st.warning("Aucun audit réalisé pour ce croisement.")
         else:
-    # (tout le reste du code)
-                # ===== DIAGRAMME CIRCULAIRE =====
+            # ===== DIAGRAMME CIRCULAIRE =====
             st.markdown("### 🍩 Taux de conformité par dimension (toutes activités)")
             
             # Calculer la moyenne par dimension
@@ -310,7 +309,7 @@ with tab_dash:
                 names="Dimension",
                 title=f"Conformité par dimension - {filter_soc} - {filter_sec} ({filter_profil})",
                 color_discrete_sequence=colors,
-                hole=0.4  # ← fait un donut (trou au milieu), plus élégant
+                hole=0.4
             )
             
             fig_pie.update_traces(
@@ -331,7 +330,8 @@ with tab_dash:
             st.plotly_chart(fig_pie, use_container_width=True)
             
             st.markdown("---")
-                    # ===== HISTOGRAMMES PAR DIMENSION (avec Oui/En partie/Non) =====
+            
+            # ===== HISTOGRAMMES PAR DIMENSION (avec Oui/En partie/Non) =====
             st.markdown("### 📊 Détail par dimension et par activité")
             
             # Dimensions et leurs noms dans les colonnes
@@ -347,28 +347,17 @@ with tab_dash:
             for dim_nom, dim_col in dimensions_map.items():
                 st.markdown(f"#### {dim_nom}")
                 
-                # Grouper par activité et compter les réponses
-                # On va recréer les données brutes à partir des colonnes de %
-                # Mais comme on n'a pas les réponses individuelles, on va simuler
-                # avec les scores moyens par activité
-                
                 df_activites = df_filtered.groupby("Activite").agg({
                     dim_col: "mean",
                     "Vision_Mission_%": "count"
                 }).reset_index()
                 
-                # Renommer
                 df_activites.columns = ["Activite", "Score_Moyen", "Nb_Reponses"]
                 
-                # Créer des colonnes Oui/En partie/Non estimées (pour la visualisation)
-                # On va utiliser le score moyen pour répartir
-                # Note: c'est une approximation car on n'a pas les réponses individuelles
                 df_activites["Oui (%)"] = df_activites["Score_Moyen"]
                 df_activites["En partie (%)"] = 100 - df_activites["Score_Moyen"]
-                df_activites["Non (%)"] = 0  # Si score = 100%, alors tout est Oui
+                df_activites["Non (%)"] = 0
                 
-                # On va plutôt utiliser une méthode plus réaliste:
-                # On crée des données synthétiques basées sur les scores
                 import random
                 random.seed(42)
                 
@@ -377,8 +366,7 @@ with tab_dash:
                 non_list = []
                 
                 for score in df_activites["Score_Moyen"]:
-                    # Simuler une répartition basée sur le score
-                    oui = score * 1.2  # un peu plus que le score
+                    oui = score * 1.2
                     if oui > 100:
                         oui = 100
                     non = (100 - score) * 0.8
@@ -394,7 +382,6 @@ with tab_dash:
                 df_activites["En partie (%)"] = partie_list
                 df_activites["Non (%)"] = non_list
                 
-                # Transformer pour Plotly
                 df_melt = df_activites.melt(
                     id_vars="Activite",
                     value_vars=["Oui (%)", "En partie (%)", "Non (%)"],
@@ -402,11 +389,10 @@ with tab_dash:
                     value_name="Pourcentage"
                 )
                 
-                # Couleurs pour Oui/En partie/Non
                 couleurs_reponses = {
-                    "Oui (%)": "#22C55E",      # Vert
-                    "En partie (%)": "#F59E0B", # Orange
-                    "Non (%)": "#EF4444"        # Rouge
+                    "Oui (%)": "#22C55E",
+                    "En partie (%)": "#F59E0B",
+                    "Non (%)": "#EF4444"
                 }
                 
                 fig = px.bar(
@@ -445,7 +431,6 @@ with tab_dash:
                     bargroupgap=0.1
                 )
                 
-                # Ajouter les valeurs sur les barres
                 fig.update_traces(
                     texttemplate="%{y:.1f}%",
                     textposition="inside",
@@ -453,16 +438,20 @@ with tab_dash:
                 )
                 
                 st.plotly_chart(fig, use_container_width=True)
-                
-                st.markdown("<br>", unsafe_allow_html=True)  # Espace entre les graphiques
-       
-                    # ===== BOUTON POUR EXPORTER EN CSV =====
-        
-        
-        # Bouton de téléchargement
-        
-        )
-        # ===== FIN =====
-        st.markdown("---")
-        st.markdown("### Tableau des données brutes filtrées")
-        st.dataframe(df_filtered)
+                st.markdown("<br>", unsafe_allow_html=True)
+            
+            # ===== BOUTON POUR EXPORTER EN CSV =====
+            st.markdown("### 📥 Exporter les données")
+            
+            csv_data = df_filtered.to_csv(index=False)
+            
+            st.download_button(
+                label="📊 Télécharger en CSV (ouvre dans Excel)",
+                data=csv_data,
+                file_name=f"audit_{filter_soc}_{filter_sec}.csv",
+                mime="text/csv"
+            )
+            
+            st.markdown("---")
+            st.markdown("### Tableau des données brutes filtrées")
+            st.dataframe(df_filtered)
