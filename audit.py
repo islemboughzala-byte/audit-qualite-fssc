@@ -445,18 +445,6 @@ with tab_dash:
                 st.markdown("<br>", unsafe_allow_html=True)
                 
             
-            # ===== BOUTON POUR EXPORTER EN CSV =====
-            st.markdown("### 📥 Exporter les données")
-            
-            csv_data = df_filtered.to_csv(index=False)
-            
-            st.download_button(
-                label="📊 Télécharger en CSV (ouvre dans Excel)",
-                data=csv_data,
-                file_name=f"audit_{filter_soc}_{filter_sec}.csv",
-                mime="text/csv"
-            )
-            
             st.markdown("---")
             st.markdown("### Tableau des données brutes filtrées")
             st.dataframe(df_filtered)
